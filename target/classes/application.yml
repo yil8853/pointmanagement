@@ -36,7 +36,7 @@ logging:
     org.hibernate.type: trace
     org.springframework.cloud: debug
 server:
-  port: 8084
+  port: 8087
 ---
 
 spring:
@@ -45,20 +45,12 @@ spring:
     stream:
       kafka:
         binder:
-          brokers: my-kafka.kafka.svc.cluster.local:9092
-        streams:
-          binder:
-            configuration:
-              default:
-                key:
-                  serde: org.apache.kafka.common.serialization.Serdes$StringSerde
-                value:
-                  serde: org.apache.kafka.common.serialization.Serdes$StringSerde
+          brokers: my-kafka2.default.svc.cluster.local:9092
       bindings:
         event-in:
           group: pointmanagement
-          destination: bookrentalcheon
+          destination: bookrental
           contentType: application/json
         event-out:
-          destination: bookrentalcheon
+          destination: bookrental
           contentType: application/json
