@@ -1,13 +1,13 @@
 # bookreservation
 
-# 예제 - 도서 대여 시스템
+# 예제 - 도서 대여 시스템 (마이크로 서비스 추가 구현 - 포인트 적립)
 
 - 체크포인트 : https://workflowy.com/s/assessment-check-po/T5YrzcMewfo4J6LW
 
 
 # Table of contents
 
-- [예제 - 도서대여](#---)
+- [예제 - 도서대여(마이크로 서비스 추가 구현 - 포인트 적립)](#---)
   - [서비스 시나리오](#서비스-시나리오)
   - [체크포인트](#체크포인트)
   - [분석/설계](#분석설계)
@@ -26,36 +26,27 @@
 
 기능적 요구사항
 1. 재고 관리자가 도서 입고 처리를 한다.
-2. 재고 입고 시 입고 수량 만큼 재고가 증가한다.
-3. 고객이 도서 입고 리스트를 보고 도서 예약 신청을 한다.
-4. 도서 예약은 1권으로 제약한다.
-5. 도서 재고가 있으면 예약에 성공한다.
-6. 도서 재고가 없으면 예약에 실패한다.
-7. 예약 성공 시 재고는 1 차감된다.
-8. 고객이 도서 예약을 취소한다.
-9. 예약이 취소되면 재고가 1 증가한다.
-10. 예약이 성공, 취소하면 카톡 등으로 알람을 보낸다.
+2. 고객이 도서 입고 리스트를 보고 도서 예약 신청을 한다.
+3. 고객의 도서 예약 신청이 정상적으로 성공하면 포인트관리 서비스에 유저 아이디를 전송한다. (CQRS)
+4. 포인트 서비스 관리자는 특정 유저 아이디와 포인트를 입력하고, View를 통해 유저 아이디를 확인후 
+유저 아이디가 존재할 경우 고객 관리 서버로 포인트 입금 알람을 전송한다. (CQRS)
+5. 유저 관리 서버에서 포인트가 정상적으로 적립 되었을 경우 콘솔로 로그를 발생한다.
 
 비기능적 요구사항
 1. 트랜잭션
     1. 모든 트랜잭션은 비동기 식으로 구성한다.
 2. 장애격리
-    1. 재고 관리 기능이 수행되지 않더라도 도서 예약은 365일 24시간 받을 수 있어야 한다. Async (event-driven), Eventual Consistency
+    1. 포인트 관리 기능이 수행되지 않더라도 예약 성공 이벤트는 365일 24시간 받을 수 있어야 한다. Async (event-driven), Eventual Consistency
 3. 성능
-    1. 고객이 재고관리에서 확인할 수 있는 도서 재고를 예약(프론트엔드)에서 확인할 수 있어야 한다. CQRS
-    1. 예약이 완료되면 카톡 등으로 알림을 줄 수 있어야 한다. Event driven
+    1. 예약 관리 서비스에서 예약이 성공한 내역은 포인트관리 서비스에서 확인할 수 있어야 한다. CQRS
+    1. 포인트 적립이 완료되면 카톡 등으로 알림을 줄 수 있어야 한다. Event driven
 
 
 
 # 분석/설계
 
 ## TO-BE 조직 (Vertically-Aligned)
-![image](https://user-images.githubusercontent.com/63623995/81637644-cf55f400-9451-11ea-9cf3-1b599eb21e5d.png)
-
-
-## Event Storming 결과
-* MSAEz 로 모델링한 이벤트스토밍 결과: http://msaez.io/#/storming/u41qKiD4gfaXC23EQCoZq4IvtuI2/mine/24b47ed1d8087379fff017f5f6671876/-M71gjp1bQwtcugFX4tl
-
+![조직도](https://user-images.githubusercontent.com/63623995/81893217-137afd00-95e8-11ea-97f0-f81f4d4bd1c3.png)
 
 ### 이벤트 도출
 원할한 토론, 이해를 위해 event-storming 초반은 한글로 작성 및 진행
@@ -80,38 +71,23 @@
 ### 폴리시 부착 및 컨텍스트 매핑은 MSAEZ 도구 사용하여 진행
 모든 언어를 영어로 변환하여, 유비쿼터스 랭귀지로 소스코드 작성 기반 마련
 
-### 1차 완성된 모형
-
-![image](https://user-images.githubusercontent.com/63623995/81631247-631fc400-9442-11ea-91d9-feca89fdb137.png)
-
-- 도서 재고 리스트인 View Model 추가
-- customermanagement 서비스 중 예약 취소 시 알람 누락
-
-### 2차 완성된 모형
-
-![image](https://user-images.githubusercontent.com/63623995/81637021-3e324d80-9450-11ea-92f6-a8a9b61f2950.png)
-
-- 고객이 예약 취소 시 고객 관리 서비스 통해 알람 발송되도록 비동기식 커넥션 추가
-- customermanagement 영역 Event가 무의미 하여, aggregate/event 제거 Needs 발생
-
 ### 완성된 모형
-
-![image](https://user-images.githubusercontent.com/63623995/81639169-2b227c00-9456-11ea-8e93-3a30d4344660.png)
+![msa2](https://user-images.githubusercontent.com/50975949/81896219-14635d00-95ef-11ea-8d57-02f097bed485.png)
 
 - customermanagement에서 이벤트 만 받아서 카톡 알람 처리하는 것으로 완결
 - 각 Aggregte Attribute
   - reservation : orderid, userid, bookid, status
   - stock : bookid, qty
+  - point : userid, point
 
 
 ### 완성본에 대한 기능적/비기능적 요구사항을 커버하는지 검증
 
-1. 재고 관리자가 도서 입고 처리를 한다. (ok)
-2. 고객이 도서 입고 리스트를 보고 도서 예약 신청을 한다.(View 추가로 ok)
-3. 도서 재고가 있으면 예약에 성공한다.(ok)
-4. 도서 재고가 없으면 예약에 실패한다.(ok)
-5. 고객이 도서 예약을 취소한다.(ok)
-6. 예약이 성공되면 카톡 등으로 알람을 보낸다.(ok)
+1. 재고 관리자가 도서 입고 처리를 한다. - 기존 기능
+2. 도서 재고가 있으면 예약에 성공한다.- 기존 기능
+3. 도서 예약에 성공하면 포인트 관리의 주문 관리 View에 유저 아이디를 저장한다.
+4. 포인트 관리자가 특정 유저 아이디와 포인트를 적립 할 경우 View의 유저 아이디를 확인하여 성공 처리한다.
+5. 정상적으로 포인트 적립이 성공 할 경우 카카오톡 서버에 로그를 발생한다.
 
 --> 완성된 모델은 모든 기능 요구사항을 커버함.
 
@@ -123,7 +99,7 @@
 
 ## 헥사고날 아키텍처 다이어그램 도출
     
-![image](https://user-images.githubusercontent.com/63623995/81639426-e0553400-9456-11ea-8346-be1d2d681305.png)
+![헥사고날](https://user-images.githubusercontent.com/63623995/81893221-170e8400-95e8-11ea-8214-838d5bdaa96f.png)
 
     - Chris Richardson, MSA Patterns 참고하여 Inbound adaptor와 Outbound adaptor를 구분함
     - 호출관계에서 PubSub 표현
@@ -132,7 +108,7 @@
 
 
 # 구현
-분석/설계 단계에서 도출된 헥사고날 아키텍처에 따라, 각 BC별로 대변되는 마이크로 서비스들을 스프링부트로 구현하였다. 구현한 각 서비스를 로컬에서 실행하는 방법은 아래와 같다 (각자의 포트넘버는 8081 ~ 8083 이다)
+분석/설계 단계에서 도출된 헥사고날 아키텍처에 따라, 각 BC별로 대변되는 마이크로 서비스들을 스프링부트로 구현하였다. 구현한 각 서비스를 로컬에서 실행하는 방법은 아래와 같다 (각자의 포트넘버는 8081 ~ 8084 이다)
 
 ```
 cd bookreservation
@@ -142,6 +118,9 @@ cd stockmanagement
 mvn spring-boot:run 
 
 cd customermanagement
+mvn spring-boot:run  
+
+cd pointmanagemnet (추가)
 mvn spring-boot:run  
 
 ```
